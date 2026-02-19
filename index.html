@@ -5,6 +5,36 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI Resume Analyzer - Career Path Predictor</title>
     <style>
+/* MCQ Test Button Styles */
+.mcq-button-container {
+    text-align: center;
+    margin: 30px 0;
+    padding: 20px;
+    background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);
+    border-radius: 15px;
+}
+
+.btn-take-test {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    padding: 15px 40px;
+    font-size: 1.2em;
+    border-radius: 50px;
+    cursor: pointer;
+    transition: all 0.3s;
+    box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+    font-weight: 600;
+}
+
+.btn-take-test:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 10px 25px rgba(102, 126, 234, 0.6);
+}
+
+.btn-take-test:active {
+    transform: translateY(-1px);
+}
         * {
             margin: 0;
             padding: 0;
@@ -506,6 +536,17 @@
                     <div id="questionsList"></div>
                 </div>
             </div>
+            <div id="mcqTestSection" class="mcq-button-container" style="display: none;">
+    <h3 style="color: #2e7d32; margin-bottom: 15px;">
+        🎓 Ready to test your knowledge?
+    </h3>
+    <p style="color: #555; margin-bottom: 20px;">
+        Based on your predicted role, take a quick MCQ test to assess your skills!
+    </p>
+    <button class="btn-take-test" onclick="goToMCQTest()">
+        🎯 Take MCQ Test
+    </button>
+</div>
 
             <div class="card">
                 <button class="reset-btn" id="resetBtn">
@@ -772,47 +813,51 @@
 
         // Display prediction results
         function displayPredictionResults(analysis) {
-            console.log('Displaying prediction:', analysis.predicted_role); // Debug log
-            
-            // Predicted role - Make it very prominent
-            const predictedRoleElement = document.getElementById('predictedRole');
-            predictedRoleElement.textContent = analysis.predicted_role;
-            predictedRoleElement.style.animation = 'fadeIn 0.5s ease-in';
+    console.log('Displaying prediction:', analysis.predicted_role); // Debug log
+    window.currentPredictedRole = analysis.normalized_role;
+    
+    // Predicted role - Make it very prominent
+    const predictedRoleElement = document.getElementById('predictedRole');
+    predictedRoleElement.textContent = analysis.predicted_role;
+    predictedRoleElement.style.animation = 'fadeIn 0.5s ease-in';
 
-            // Confidence
-            const confidence = (analysis.confidence * 100).toFixed(1);
-            const confidenceFill = document.getElementById('confidenceFill');
-            const confidenceText = document.getElementById('confidenceText');
-            
-            setTimeout(() => {
-                confidenceFill.style.width = confidence + '%';
-                confidenceText.textContent = confidence + '%';
-            }, 100);
+    // Confidence
+    const confidence = (analysis.confidence * 100).toFixed(1);
+    const confidenceFill = document.getElementById('confidenceFill');
+    const confidenceText = document.getElementById('confidenceText');
+    
+    setTimeout(() => {
+        confidenceFill.style.width = confidence + '%';
+        confidenceText.textContent = confidence + '%';
+    }, 100);
 
-            // Top 3 predictions
-            const topPredictionsList = document.getElementById('topPredictionsList');
-            topPredictionsList.innerHTML = analysis.top_3_roles
-                .map(([role, prob], index) => `
-                    <div class="prediction-item">
-                        <span><strong>${index + 1}.</strong> ${role}</span>
-                        <span><strong>${(prob * 100).toFixed(1)}%</strong></span>
-                    </div>
-                `).join('');
+    // Top 3 predictions
+    const topPredictionsList = document.getElementById('topPredictionsList');
+    topPredictionsList.innerHTML = analysis.top_3_roles
+        .map(([role, prob], index) => `
+            <div class="prediction-item">
+                <span><strong>${index + 1}.</strong> ${role}</span>
+                <span><strong>${(prob * 100).toFixed(1)}%</strong></span>
+            </div>
+        `).join('');
 
-            // Interview questions
-            const questionsList = document.getElementById('questionsList');
-            questionsList.innerHTML = analysis.interview_questions
-                .map(question => `<div class="question-item">${question}</div>`)
-                .join('');
-            
-            // Scroll to prediction card smoothly
-            setTimeout(() => {
-                document.getElementById('predictionCard').scrollIntoView({ 
-                    behavior: 'smooth', 
-                    block: 'start' 
-                });
-            }, 500);
-        }
+    // Interview questions
+    const questionsList = document.getElementById('questionsList');
+    questionsList.innerHTML = analysis.interview_questions
+        .map(question => `<div class="question-item">${question}</div>`)
+        .join('');
+    
+    // ✨ NEW: Show MCQ Test Button after displaying results
+    showMCQTestButton();
+    
+    // Scroll to prediction card smoothly
+    setTimeout(() => {
+        document.getElementById('predictionCard').scrollIntoView({ 
+            behavior: 'smooth', 
+            block: 'start' 
+        });
+    }, 500);
+}
 
         // Helper functions
         function getScoreColor(score) {
@@ -838,6 +883,20 @@
             uploadCard.style.display = 'block';
             results.classList.remove('show');
         });
+        function showMCQTestButton() {
+    const mcqSection = document.getElementById('mcqTestSection');
+    if (mcqSection) {
+        mcqSection.style.display = 'block';
+        // Smooth scroll to the button
+        mcqSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+}
+
+// Function to navigate to MCQ test page
+function goToMCQTest() {
+    const role = window.currentPredictedRole || 'DEFAULT';
+    window.location.href = `mcq_test.html?role=${encodeURIComponent(role)}`;
+}
     </script>
 </body>
 </html>

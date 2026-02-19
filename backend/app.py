@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, session
 from flask_cors import CORS
 import json
 import os
@@ -6,41 +6,258 @@ import sys
 import PyPDF2
 import docx
 import re
+from datetime import datetime
+import secrets
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from models.predict import ResumePredictor
+from database import Database
 
 app = Flask(__name__)
-CORS(app)
+CORS(app, supports_credentials=True)
+app.secret_key = secrets.token_hex(16)
 
-# Configure upload settings
-app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB max file size
+app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024
 app.config['UPLOAD_EXTENSIONS'] = ['.pdf', '.docx']
 
-# Load predictor
 predictor = ResumePredictor()
 
-# Load interview questions
+db = Database(
+    server='localhost\\SQLEXPRESS',
+    use_windows_auth=True
+)
+
 questions_path = os.path.join(os.path.dirname(__file__), 'data', 'interview_questions.json')
 with open(questions_path, 'r') as f:
     interview_questions = json.load(f)
 
 
+# ============================================================
+# ROLE NORMALIZATION MAP
+# This maps whatever your ML model outputs → exact DB role name
+# ============================================================
+ROLE_NORMALIZATION_MAP = {
+    # Data Science variants
+    'data scientist':        'DATA-SCIENCE',
+    'data science':          'DATA-SCIENCE',
+    'data-science':          'DATA-SCIENCE',
+    'data_science':          'DATA-SCIENCE',
+    'datascience':           'DATA-SCIENCE',
+    'DATA SCIENTIST':        'DATA-SCIENCE',
+    'DATA-SCIENTIST':        'DATA-SCIENCE',
+
+    # Web Developer variants
+    'web developer':         'WEB-DEVELOPER',
+    'web development':       'WEB-DEVELOPER',
+    'web-developer':         'WEB-DEVELOPER',
+    'web_developer':         'WEB-DEVELOPER',
+    'webdeveloper':          'WEB-DEVELOPER',
+    'WEB DEVELOPER':         'WEB-DEVELOPER',
+
+    # Python Developer variants
+    'python developer':      'DATA-SCIENCE',   # maps to DATA-SCIENCE since no PYTHON role in DB
+    'python':                'DATA-SCIENCE',
+    'python dev':            'DATA-SCIENCE',
+
+    # HR variants
+    'hr':                    'HR',
+    'human resources':       'HR',
+    'human resource':        'HR',
+    'hr manager':            'HR',
+
+    # Designer variants
+    'designer':              'DESIGNER',
+    'ui designer':           'DESIGNER',
+    'ux designer':           'DESIGNER',
+    'ui/ux designer':        'DESIGNER',
+    'graphic designer':      'DESIGNER',
+
+    # Information Technology variants
+    'information technology': 'INFORMATION-TECHNOLOGY',
+    'information-technology': 'INFORMATION-TECHNOLOGY',
+    'it':                    'INFORMATION-TECHNOLOGY',
+    'it professional':       'INFORMATION-TECHNOLOGY',
+
+    # Teacher variants
+    'teacher':               'TEACHER',
+    'educator':              'TEACHER',
+    'professor':             'TEACHER',
+    'instructor':            'TEACHER',
+
+    # Advocate variants
+    'advocate':              'ADVOCATE',
+    'lawyer':                'ADVOCATE',
+    'attorney':              'ADVOCATE',
+    'legal':                 'ADVOCATE',
+
+    # Business Development variants
+    'business development':  'BUSINESS-DEVELOPMENT',
+    'business-development':  'BUSINESS-DEVELOPMENT',
+    'business developer':    'BUSINESS-DEVELOPMENT',
+    'bd':                    'BUSINESS-DEVELOPMENT',
+
+    # Healthcare variants
+    'healthcare':            'HEALTHCARE',
+    'health care':           'HEALTHCARE',
+    'medical':               'HEALTHCARE',
+    'doctor':                'HEALTHCARE',
+    'nurse':                 'HEALTHCARE',
+
+    # Fitness variants
+    'fitness':               'FITNESS',
+    'fitness trainer':       'FITNESS',
+    'personal trainer':      'FITNESS',
+    'gym trainer':           'FITNESS',
+
+    # Agriculture variants
+    'agriculture':           'AGRICULTURE',
+    'agriculturist':         'AGRICULTURE',
+    'farmer':                'AGRICULTURE',
+
+    # BPO variants
+    'bpo':                   'BPO',
+    'call center':           'BPO',
+    'customer service':      'BPO',
+
+    # Sales variants
+    'sales':                 'SALES',
+    'sales executive':       'SALES',
+    'sales manager':         'SALES',
+
+    # Consultant variants
+    'consultant':            'CONSULTANT',
+    'consulting':            'CONSULTANT',
+    'business consultant':   'CONSULTANT',
+
+    # Digital Media variants
+    'digital media':         'DIGITAL-MEDIA',
+    'digital-media':         'DIGITAL-MEDIA',
+    'digital marketing':     'DIGITAL-MEDIA',
+    'social media':          'DIGITAL-MEDIA',
+
+    # Automobile variants
+    'automobile':            'AUTOMOBILE',
+    'automotive':            'AUTOMOBILE',
+    'mechanic':              'AUTOMOBILE',
+
+    # Chef variants
+    'chef':                  'CHEF',
+    'cook':                  'CHEF',
+    'culinary':              'CHEF',
+
+    # Finance variants
+    'finance':               'FINANCE',
+    'financial analyst':     'FINANCE',
+    'finance manager':       'FINANCE',
+
+    # Apparel variants
+    'apparel':               'APPAREL',
+    'fashion':               'APPAREL',
+    'fashion designer':      'APPAREL',
+
+    # Engineering variants
+    'engineering':           'ENGINEERING',
+    'engineer':              'ENGINEERING',
+    'software engineer':     'ENGINEERING',
+    'civil engineer':        'ENGINEERING',
+    'mechanical engineer':   'ENGINEERING',
+
+    # Accountant variants
+    'accountant':            'ACCOUNTANT',
+    'accounting':            'ACCOUNTANT',
+    'ca':                    'ACCOUNTANT',
+    'chartered accountant':  'ACCOUNTANT',
+
+    # Construction variants
+    'construction':          'CONSTRUCTION',
+    'civil':                 'CONSTRUCTION',
+    'construction manager':  'CONSTRUCTION',
+
+    # Public Relations variants
+    'public relations':      'PUBLIC-RELATIONS',
+    'public-relations':      'PUBLIC-RELATIONS',
+    'pr':                    'PUBLIC-RELATIONS',
+
+    # Banking variants
+    'banking':               'BANKING',
+    'bank':                  'BANKING',
+    'banker':                'BANKING',
+    'finance banking':       'BANKING',
+
+    # Arts variants
+    'arts':                  'ARTS',
+    'artist':                'ARTS',
+    'fine arts':             'ARTS',
+
+    # Aviation variants
+    'aviation':              'AVIATION',
+    'pilot':                 'AVIATION',
+    'airline':               'AVIATION',
+
+    # Default
+    'general':               'DEFAULT',
+    'default':               'DEFAULT',
+}
+
+# All valid DB roles
+VALID_DB_ROLES = {
+    'HR', 'DESIGNER', 'INFORMATION-TECHNOLOGY', 'TEACHER', 'ADVOCATE',
+    'BUSINESS-DEVELOPMENT', 'HEALTHCARE', 'FITNESS', 'AGRICULTURE', 'BPO',
+    'SALES', 'CONSULTANT', 'DIGITAL-MEDIA', 'AUTOMOBILE', 'CHEF', 'FINANCE',
+    'APPAREL', 'ENGINEERING', 'ACCOUNTANT', 'CONSTRUCTION', 'PUBLIC-RELATIONS',
+    'BANKING', 'ARTS', 'AVIATION', 'DATA-SCIENCE', 'WEB-DEVELOPER', 'DEFAULT'
+}
+
+
+def normalize_role(predicted_role: str) -> str:
+    """
+    Converts any ML model output into the exact role name stored in the DB.
+
+    Steps:
+    1. Check if it's already a valid DB role (exact match)
+    2. Try lowercase lookup in normalization map
+    3. Try partial/substring match against valid roles
+    4. Fall back to DEFAULT
+    """
+    if not predicted_role:
+        return 'DEFAULT'
+
+    # Step 1: Direct match — already a valid DB role
+    if predicted_role in VALID_DB_ROLES:
+        print(f"[ROLE] Direct match: '{predicted_role}'")
+        return predicted_role
+
+    # Step 2: Lowercase lookup in normalization map
+    lower = predicted_role.lower().strip()
+    if lower in ROLE_NORMALIZATION_MAP:
+        mapped = ROLE_NORMALIZATION_MAP[lower]
+        print(f"[ROLE] Mapped: '{predicted_role}' → '{mapped}'")
+        return mapped
+
+    # Step 3: Partial match — e.g. "Data Scientist (Senior)" → DATA-SCIENCE
+    for key, value in ROLE_NORMALIZATION_MAP.items():
+        if key in lower or lower in key:
+            print(f"[ROLE] Partial match: '{predicted_role}' → '{value}'")
+            return value
+
+    # Step 4: Check if any valid role is a substring of the predicted role
+    upper = predicted_role.upper().replace(' ', '-')
+    for valid_role in VALID_DB_ROLES:
+        if valid_role in upper or upper in valid_role:
+            print(f"[ROLE] Substring match: '{predicted_role}' → '{valid_role}'")
+            return valid_role
+
+    print(f"[ROLE] No match found for '{predicted_role}', falling back to DEFAULT")
+    return 'DEFAULT'
+
+
 def extract_text_from_pdf(file):
-    """Extract text from PDF file with better error handling"""
     try:
         pdf_reader = PyPDF2.PdfReader(file)
         text = ""
-        
         total_pages = len(pdf_reader.pages)
-        # For very large PDFs, limit to first 50 pages to avoid memory issues
         max_pages = min(total_pages, 50)
-        
-        if total_pages > 50:
-            print(f"Warning: PDF has {total_pages} pages. Processing first 50 pages only.")
-        
-        # Extract text from pages
         for page_num in range(max_pages):
             try:
                 page = pdf_reader.pages[page_num]
@@ -50,71 +267,43 @@ def extract_text_from_pdf(file):
             except Exception as e:
                 print(f"Warning: Could not extract text from page {page_num + 1}: {str(e)}")
                 continue
-        
         if not text.strip():
-            raise Exception("No text could be extracted from PDF. The file might be scanned or image-based.")
-        
-        # For very long resumes, truncate to reasonable length (first 50,000 characters)
+            raise Exception("No text could be extracted from PDF.")
         if len(text) > 50000:
-            print(f"Warning: Resume text is very long ({len(text)} chars). Truncating to 50,000 characters.")
             text = text[:50000]
-        
         return text
     except Exception as e:
         raise Exception(f"Error reading PDF: {str(e)}")
 
 
 def extract_text_from_docx(file):
-    """Extract text from DOCX file with better error handling"""
     try:
         doc = docx.Document(file)
-        
-        # Extract text from paragraphs
-        paragraphs = [paragraph.text for paragraph in doc.paragraphs if paragraph.text.strip()]
-        
-        # Extract text from tables
+        paragraphs = [p.text for p in doc.paragraphs if p.text.strip()]
         tables_text = []
         for table in doc.tables:
             for row in table.rows:
                 row_text = [cell.text for cell in row.cells if cell.text.strip()]
                 if row_text:
                     tables_text.append(' '.join(row_text))
-        
-        # Combine all text
         text = '\n'.join(paragraphs + tables_text)
-        
         if not text.strip():
             raise Exception("No text could be extracted from DOCX file.")
-        
-        # For very long resumes, truncate to reasonable length (first 50,000 characters)
         if len(text) > 50000:
-            print(f"Warning: Resume text is very long ({len(text)} chars). Truncating to 50,000 characters.")
             text = text[:50000]
-        
         return text
     except Exception as e:
         raise Exception(f"Error reading DOCX: {str(e)}")
 
 
 def check_ats_friendliness(text):
-    """
-    Comprehensive ATS friendliness checker
-    Returns: {
-        'is_ats_friendly': bool,
-        'score': int (0-100),
-        'issues': list of issues,
-        'suggestions': list of improvements,
-        'details': detailed breakdown
-    }
-    """
     issues = []
     suggestions = []
     score = 100
     details = {}
-    
-    # Check 1: Minimum length (well-detailed resume)
+
     if len(text) < 300:
-        issues.append("Resume is too short - lacks sufficient detail")
+        issues.append("Resume is too short")
         suggestions.append("Add more details about your experience, skills, and achievements")
         score -= 25
         details['length'] = 'Poor'
@@ -125,134 +314,78 @@ def check_ats_friendliness(text):
         details['length'] = 'Fair'
     else:
         details['length'] = 'Good'
-    
-    # Check 2: Contact Information
+
     text_lower = text.lower()
-    
     email_pattern = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
     phone_pattern = r'(\+\d{1,3}[-.\s]?)?(\(?\d{3}\)?[-.\s]?)?\d{3}[-.\s]?\d{4}'
-    
     has_email = bool(re.search(email_pattern, text))
     has_phone = bool(re.search(phone_pattern, text))
-    
+
     if not has_email:
         issues.append("Missing email address")
-        suggestions.append("Add a professional email address at the top of your resume")
+        suggestions.append("Add a professional email address")
         score -= 15
-    
     if not has_phone:
         issues.append("Missing phone number")
         suggestions.append("Include your contact phone number")
         score -= 10
-    
     details['contact_info'] = 'Complete' if (has_email and has_phone) else 'Incomplete'
-    
-    # Check 3: Essential Sections
+
     sections_found = []
     sections_missing = []
-    
     section_keywords = {
-        'Experience': ['experience', 'work history', 'employment', 'professional experience', 'work experience'],
+        'Experience': ['experience', 'work history', 'employment', 'professional experience'],
         'Education': ['education', 'qualification', 'degree', 'academic', 'university', 'college'],
-        'Skills': ['skills', 'technical skills', 'competencies', 'proficiencies', 'expertise'],
-        'Summary': ['summary', 'objective', 'profile', 'about me', 'professional summary']
+        'Skills': ['skills', 'technical skills', 'competencies', 'proficiencies'],
+        'Summary': ['summary', 'objective', 'profile', 'about me']
     }
-    
     for section, keywords in section_keywords.items():
-        if any(keyword in text_lower for keyword in keywords):
+        if any(k in text_lower for k in keywords):
             sections_found.append(section)
         else:
             sections_missing.append(section)
             if section in ['Experience', 'Education', 'Skills']:
                 issues.append(f"Missing '{section}' section")
-                suggestions.append(f"Add a clear '{section}' section to your resume")
+                suggestions.append(f"Add a clear '{section}' section")
                 score -= 15
-    
+
     details['sections'] = f"{len(sections_found)}/4 key sections found"
-    
-    # Check 4: Action Verbs and Keywords
-    action_verbs = ['developed', 'managed', 'led', 'created', 'implemented', 'designed', 
-                    'analyzed', 'improved', 'coordinated', 'achieved', 'executed', 
+
+    action_verbs = ['developed', 'managed', 'led', 'created', 'implemented', 'designed',
+                    'analyzed', 'improved', 'coordinated', 'achieved', 'executed',
                     'established', 'built', 'optimized', 'delivered', 'increased']
-    
-    verb_count = sum(1 for verb in action_verbs if verb in text_lower)
-    
+    verb_count = sum(1 for v in action_verbs if v in text_lower)
     if verb_count < 3:
         issues.append("Limited use of strong action verbs")
-        suggestions.append("Use more action verbs like: developed, managed, led, implemented, achieved")
+        suggestions.append("Use more action verbs like: developed, managed, led")
         score -= 12
         details['action_verbs'] = 'Poor'
     elif verb_count < 6:
         details['action_verbs'] = 'Fair'
     else:
         details['action_verbs'] = 'Good'
-    
-    # Check 5: Formatting Issues (special characters from tables/images)
+
     special_char_ratio = len(re.findall(r'[^\w\s.,;:!?()\-\'/\n]', text)) / max(len(text), 1)
-    
     if special_char_ratio > 0.08:
-        issues.append("Excessive special characters detected (likely from complex formatting)")
-        suggestions.append("Avoid tables, text boxes, and graphics. Use simple bullet points")
+        issues.append("Excessive special characters detected")
+        suggestions.append("Use simple bullet points, avoid tables and text boxes")
         score -= 12
         details['formatting'] = 'Complex (may cause ATS issues)'
     else:
         details['formatting'] = 'Simple (ATS-friendly)'
-    
-    # Check 6: Bullet Points
-    bullet_indicators = ['•', '◦', '○', '■', '▪', '-', '*', '►', '→']
-    has_bullets = any(char in text for char in bullet_indicators)
-    
-    if not has_bullets and len(text) > 500:
-        issues.append("No bullet points found - content may be hard to parse")
-        suggestions.append("Use bullet points to list your responsibilities and achievements")
-        score -= 8
-    
-    # Check 7: Dates (for experience/education)
-    date_patterns = [
-        r'\b(19|20)\d{2}\b',  # Years
-        r'\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]* \d{4}\b',  # Month Year
-        r'\d{1,2}/\d{4}',  # MM/YYYY
-    ]
-    
-    date_count = sum(len(re.findall(pattern, text)) for pattern in date_patterns)
-    
-    if date_count < 2:
-        issues.append("Missing dates for experience or education")
-        suggestions.append("Include dates (MM/YYYY format) for your work experience and education")
-        score -= 8
-    
-    # Check 8: Length of experience descriptions
-    if 'experience' in text_lower:
-        exp_index = text_lower.find('experience')
-        content_after_exp = text[exp_index:exp_index+500] if exp_index != -1 else ""
-        
-        if len(content_after_exp) < 200:
-            issues.append("Work experience section seems too brief")
-            suggestions.append("Provide more details about your roles, responsibilities, and achievements")
-            score -= 10
-    
-    # Check 9: Headers/Titles
-    caps_words = re.findall(r'\b[A-Z]{2,}\b', text)
-    if len(caps_words) < 3 and len(text) > 500:
-        suggestions.append("Consider using clear section headers (e.g., EXPERIENCE, EDUCATION, SKILLS)")
-        score -= 5
-    
-    # Final score adjustment
+
     score = max(0, min(100, score))
-    
-    # Determine if ATS-friendly (threshold: 70)
     is_ats_friendly = score >= 70
-    
-    # Overall assessment
+
     if score >= 85:
         overall = "Excellent - Highly ATS-friendly"
     elif score >= 70:
         overall = "Good - ATS-friendly with minor improvements possible"
     elif score >= 50:
-        overall = "Fair - Needs improvement for better ATS compatibility"
+        overall = "Fair - Needs improvement"
     else:
         overall = "Poor - Major improvements needed"
-    
+
     return {
         'is_ats_friendly': is_ats_friendly,
         'score': score,
@@ -265,59 +398,57 @@ def check_ats_friendliness(text):
 
 @app.route('/api/health', methods=['GET'])
 def health_check():
-    """Health check endpoint"""
     return jsonify({'status': 'ok', 'message': 'API is running'})
 
 
 @app.route('/api/upload-resume', methods=['POST'])
 def upload_resume():
-    """
-    Upload resume file, check ATS friendliness, and analyze if friendly
-    """
     try:
         if 'file' not in request.files:
             return jsonify({'error': 'No file uploaded'}), 400
-        
+
         file = request.files['file']
-        
         if file.filename == '':
             return jsonify({'error': 'No file selected'}), 400
-        
+
         filename = file.filename.lower()
-        
-        # Check file extension
         if not (filename.endswith('.pdf') or filename.endswith('.docx')):
             return jsonify({'error': 'Invalid file format. Please upload PDF or DOCX'}), 400
-        
-        # Extract text based on file type
+
         try:
             if filename.endswith('.pdf'):
                 resume_text = extract_text_from_pdf(file)
-            else:  # .docx
+            else:
                 resume_text = extract_text_from_docx(file)
         except Exception as e:
             return jsonify({'error': str(e)}), 400
-        
+
         if not resume_text or len(resume_text.strip()) < 50:
-            return jsonify({'error': 'Could not extract sufficient text from file. Please ensure the file contains readable text.'}), 400
-        
-        # Check ATS friendliness
+            return jsonify({'error': 'Could not extract sufficient text from file.'}), 400
+
         ats_result = check_ats_friendliness(resume_text)
-        
-        response = {
-            'ats_check': ats_result,
-            'resume_text_length': len(resume_text)
-        }
-        
-        # If ATS-friendly, analyze with ML model
+        response = {'ats_check': ats_result, 'resume_text_length': len(resume_text)}
+
         if ats_result['is_ats_friendly']:
             try:
                 prediction = predictor.predict(resume_text)
-                predicted_role = prediction['predicted_role']
-                questions = interview_questions.get(predicted_role, interview_questions['DEFAULT'])
-                
+                raw_role = prediction['predicted_role']
+
+                # ✅ FIX: Normalize the role before storing in session
+                normalized_role = normalize_role(raw_role)
+
+                print(f"[RESUME] Raw predicted role: '{raw_role}'")
+                print(f"[RESUME] Normalized role for DB: '{normalized_role}'")
+
+                session['predicted_job_role'] = normalized_role
+                session['raw_predicted_role'] = raw_role
+                session['prediction_confidence'] = prediction['confidence']
+
+                questions = interview_questions.get(raw_role, interview_questions['DEFAULT'])
+
                 response['analysis'] = {
-                    'predicted_role': predicted_role,
+                    'predicted_role': raw_role,
+                    'normalized_role': normalized_role,
                     'confidence': prediction['confidence'],
                     'top_3_roles': prediction['top_3_roles'],
                     'interview_questions': questions
@@ -325,9 +456,9 @@ def upload_resume():
             except Exception as e:
                 print(f"Analysis error: {str(e)}")
                 response['analysis_error'] = f"Could not analyze resume: {str(e)}"
-        
+
         return jsonify(response), 200
-        
+
     except Exception as e:
         print(f"Server error: {str(e)}")
         return jsonify({'error': f"Server error: {str(e)}"}), 500
@@ -335,57 +466,188 @@ def upload_resume():
 
 @app.route('/api/analyze-resume', methods=['POST'])
 def analyze_resume():
-    """Analyze resume text directly (for resume builder integration)"""
     try:
         data = request.get_json()
         resume_text = data.get('resume_text', '')
-        
         if not resume_text:
             return jsonify({'error': 'No resume text provided'}), 400
-        
-        # Check ATS first
+
         ats_result = check_ats_friendliness(resume_text)
-        
-        response = {
-            'ats_check': ats_result
-        }
-        
-        # Analyze if ATS-friendly
+        response = {'ats_check': ats_result}
+
         if ats_result['is_ats_friendly']:
             try:
                 prediction = predictor.predict(resume_text)
-                predicted_role = prediction['predicted_role']
-                questions = interview_questions.get(predicted_role, interview_questions['DEFAULT'])
-                
+                raw_role = prediction['predicted_role']
+
+                # ✅ FIX: Normalize role
+                normalized_role = normalize_role(raw_role)
+
+                session['predicted_job_role'] = normalized_role
+                session['raw_predicted_role'] = raw_role
+                session['prediction_confidence'] = prediction['confidence']
+
+                questions = interview_questions.get(raw_role, interview_questions['DEFAULT'])
+
                 response['analysis'] = {
-                    'predicted_role': predicted_role,
+                    'predicted_role': raw_role,
+                    'normalized_role': normalized_role,
                     'confidence': prediction['confidence'],
                     'top_3_roles': prediction['top_3_roles'],
                     'interview_questions': questions
                 }
             except Exception as e:
                 response['analysis_error'] = f"Could not analyze resume: {str(e)}"
-        
+
         return jsonify(response), 200
-        
+
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
 
+# ========================================
+# MCQ TEST ENDPOINTS
+# ========================================
+
+@app.route('/api/get-mcq-test', methods=['GET'])
+def get_mcq_test():
+    try:
+        # ✅ FIX: Role is already normalized when stored in session
+        job_role = request.args.get('role') or session.get('predicted_job_role', 'DEFAULT')
+
+        print(f"[MCQ] Fetching questions for role: '{job_role}'")
+
+        questions = db.get_questions_by_role(job_role, limit=10)
+
+        # ✅ FIX: If still no questions, fall back to DEFAULT
+        if not questions:
+            print(f"[MCQ] No questions for '{job_role}', trying DEFAULT")
+            questions = db.get_questions_by_role('DEFAULT', limit=10)
+
+        if not questions:
+            return jsonify({'error': f'No questions found for role: {job_role}'}), 404
+
+        session['test_question_ids'] = [q['id'] for q in questions]
+        session['test_start_time'] = datetime.now().isoformat()
+
+        safe_questions = []
+        for q in questions:
+            safe_questions.append({
+                'id': q['id'],
+                'question': q['question'],
+                'options': q['options'],
+                'difficulty': q.get('difficulty', 'medium')
+            })
+
+        return jsonify({
+            'success': True,
+            'job_role': session.get('raw_predicted_role', job_role),  # Show friendly name to user
+            'db_role': job_role,
+            'questions': safe_questions,
+            'total_questions': len(safe_questions)
+        })
+
+    except Exception as e:
+        print(f"MCQ Test Error: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/submit-test', methods=['POST'])
+def submit_test():
+    try:
+        data = request.get_json()
+        answers = data.get('answers', {})
+        
+        # ✅ Read from request body first, fallback to session
+        question_ids = data.get('question_ids') or session.get('test_question_ids', [])
+
+        if not question_ids:
+            return jsonify({'error': 'No active test found. Please start a new test.'}), 400
+
+        results = []
+        correct_count = 0
+        total_questions = len(question_ids)
+
+        for question_id in question_ids:
+            question_data = db.get_question_by_id(question_id)
+            user_answer = answers.get(str(question_id))
+            correct_answer = question_data['correct_answer']
+            is_correct = (user_answer == correct_answer)
+            if is_correct:
+                correct_count += 1
+
+            results.append({
+                'question_id': question_id,
+                'question': question_data['question'],
+                'options': question_data['options'],
+                'user_answer': user_answer,
+                'correct_answer': correct_answer,
+                'is_correct': is_correct,
+                'explanation': question_data.get('explanation', '')
+            })
+
+        score_percentage = (correct_count / total_questions) * 100
+        job_role = data.get('role', session.get('predicted_job_role', 'DEFAULT'))
+        
+        test_result = {
+            'job_role': job_role,
+            'total_questions': total_questions,
+            'correct_answers': correct_count,
+            'score_percentage': score_percentage,
+            'timestamp': datetime.now().isoformat()
+        }
+        db.save_test_result(test_result)
+
+        return jsonify({
+            'success': True,
+            'score': score_percentage,
+            'correct_answers': correct_count,
+            'total_questions': total_questions,
+            'results': results,
+            'passed': score_percentage >= 60
+        })
+
+    except Exception as e:
+        print(f"Submit Test Error: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/get-test-history', methods=['GET'])
+def get_test_history():
+    try:
+        history = db.get_test_history(limit=10)
+        return jsonify({'success': True, 'history': history})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+# ✅ NEW: Debug endpoint to check what role was detected
+@app.route('/api/debug-role', methods=['GET'])
+def debug_role():
+    return jsonify({
+        'raw_predicted_role': session.get('raw_predicted_role', 'Not set'),
+        'normalized_role': session.get('predicted_job_role', 'Not set'),
+        'confidence': session.get('prediction_confidence', 'Not set')
+    })
+
+
 @app.errorhandler(413)
 def request_entity_too_large(error):
-    """Handle file too large error"""
     return jsonify({'error': 'File too large. Maximum size is 50MB'}), 413
 
 
 if __name__ == '__main__':
-    print("="*60)
-    print("🚀 Resume Analysis API with ATS Checker")
-    print("="*60)
+    print("=" * 60)
+    print("🚀 Resume Analysis API with ATS Checker & MCQ Tests")
+    print("=" * 60)
     print("📍 API running at: http://localhost:5000")
-    print("\n🔗 Available endpoints:")
+    print("\n🔗 Endpoints:")
     print("  GET  /api/health")
     print("  POST /api/upload-resume")
     print("  POST /api/analyze-resume")
-    print("\n" + "="*60)
+    print("  GET  /api/get-mcq-test")
+    print("  POST /api/submit-test")
+    print("  GET  /api/get-test-history")
+    print("  GET  /api/debug-role          ← Use this to debug role issues")
+    print("=" * 60)
     app.run(debug=True, port=5000, host='0.0.0.0')
