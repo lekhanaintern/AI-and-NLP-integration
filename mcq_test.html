@@ -3,446 +3,457 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MCQ Test - Resume Analyzer</title>
+    <title>MCQ Test - AI Resume Analyzer</title>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
+        :root {
+            --primary: #3b6fd4;
+            --primary-end: #06b6d4;
+            --bg: #f0f2f8;
+            --white: #ffffff;
+            --navbar: #4361d8;
+            --navbar-end: #3b82f6;
+            --text: #1e293b;
+            --muted: #64748b;
+            --border: #e2e8f0;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --card-shadow: 0 4px 24px rgba(59,111,212,0.10);
+            --grad: linear-gradient(135deg, var(--primary) 0%, var(--primary-end) 100%);
         }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
 
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background: var(--bg);
             min-height: 100vh;
-            padding: 20px;
+            color: var(--text);
         }
 
-        .container {
-            max-width: 900px;
-            margin: 0 auto;
-            background: white;
-            border-radius: 20px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-            overflow: hidden;
+        /* NAVBAR */
+        .navbar {
+            background: linear-gradient(90deg, var(--navbar) 0%, var(--navbar-end) 100%);
+            padding: 0 32px;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 2px 12px rgba(59,111,212,0.18);
+            position: sticky;
+            top: 0;
+            z-index: 100;
         }
 
-        .header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        .navbar-brand { font-size: 1.25em; font-weight: 800; color: white; letter-spacing: -0.5px; }
+        .navbar-brand span { font-weight: 400; opacity: 0.85; }
+
+        .nav-back {
+            background: rgba(255,255,255,0.18);
+            border: 1px solid rgba(255,255,255,0.3);
             color: white;
-            padding: 30px;
-            text-align: center;
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: 0.82em;
+            font-weight: 600;
+            cursor: pointer;
+            text-decoration: none;
+            transition: background 0.2s;
+            font-family: inherit;
         }
 
-        .header h1 {
-            font-size: 2em;
-            margin-bottom: 10px;
+        .nav-back:hover { background: rgba(255,255,255,0.28); }
+
+        /* PAGE */
+        .page { max-width: 860px; margin: 0 auto; padding: 32px 20px 60px; }
+
+        /* PAGE TITLE */
+        .page-title { text-align: center; margin-bottom: 28px; }
+        .page-title h1 {
+            font-size: 1.9em; font-weight: 800;
+            background: var(--grad);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 4px;
+        }
+        .page-title p { color: var(--muted); font-size: 0.9em; }
+
+        /* CARD */
+        .card {
+            background: var(--white);
+            border-radius: 16px;
+            padding: 28px;
+            box-shadow: var(--card-shadow);
+            border: 1px solid var(--border);
+            margin-bottom: 20px;
         }
 
-        .content {
-            padding: 40px;
+        /* HIDDEN */
+        .hidden { display: none !important; }
+
+        /* INFO BOX */
+        .info-box {
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
+            border-radius: 12px;
+            padding: 20px 24px;
+            margin-bottom: 24px;
         }
 
-        /* Start Test Button */
-        .start-section {
-            text-align: center;
-            padding: 40px;
+        .info-box p {
+            font-size: 0.88em;
+            color: #1e40af;
+            margin-bottom: 6px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
 
+        .info-box p:first-child { font-weight: 700; font-size: 0.92em; margin-bottom: 10px; }
+        .info-box p:last-child { margin-bottom: 0; }
+
+        /* BUTTONS */
         .btn-primary {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: var(--grad);
             color: white;
             border: none;
-            padding: 15px 40px;
-            font-size: 1.2em;
+            padding: 13px 36px;
+            font-size: 1em;
             border-radius: 50px;
             cursor: pointer;
-            transition: all 0.3s;
-            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+            font-weight: 700;
+            font-family: inherit;
+            transition: all 0.25s;
+            box-shadow: 0 4px 16px rgba(59,111,212,0.3);
         }
 
-        .btn-primary:hover {
+        .btn-primary:hover:not(:disabled) {
             transform: translateY(-2px);
-            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.6);
+            box-shadow: 0 8px 24px rgba(59,111,212,0.4);
         }
 
-        .btn-primary:disabled {
-            background: #ccc;
-            cursor: not-allowed;
-            transform: none;
+        .btn-primary:disabled { background: #cbd5e1; cursor: not-allowed; box-shadow: none; }
+
+        .btn-secondary {
+            background: #f1f5f9;
+            color: var(--muted);
+            border: 1px solid var(--border);
+            padding: 12px 28px;
+            font-size: 0.95em;
+            border-radius: 50px;
+            cursor: pointer;
+            font-weight: 600;
+            font-family: inherit;
+            transition: all 0.2s;
         }
 
-        /* Progress Bar */
-        .progress-section {
-            margin-bottom: 30px;
-        }
+        .btn-secondary:hover { background: #e2e8f0; color: var(--text); }
+
+        /* START SECTION */
+        .start-section { text-align: center; padding: 20px 0; }
+
+        /* PROGRESS */
+        .progress-section { margin-bottom: 24px; }
 
         .progress-bar {
             width: 100%;
-            height: 35px;
-            background: #f0f0f0;
-            border-radius: 20px;
+            height: 32px;
+            background: #e2e8f0;
+            border-radius: 16px;
             overflow: hidden;
-            position: relative;
         }
 
         .progress-fill {
             height: 100%;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            transition: width 0.3s;
+            background: var(--grad);
+            border-radius: 16px;
             display: flex;
             align-items: center;
             justify-content: center;
             color: white;
-            font-weight: bold;
-            font-size: 0.9em;
+            font-weight: 700;
+            font-size: 0.82em;
+            transition: width 0.35s ease;
+            min-width: 36px;
         }
 
         .progress-text {
             text-align: center;
-            margin-top: 10px;
-            color: #666;
-            font-size: 0.95em;
+            margin-top: 8px;
+            color: var(--muted);
+            font-size: 0.85em;
         }
 
-        /* Question Card */
+        /* QUESTION CARD */
         .question-card {
             background: white;
-            border: 2px solid #e0e0e0;
-            border-radius: 15px;
-            padding: 30px;
-            margin: 25px 0;
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
-            transition: all 0.3s;
+            border: 1.5px solid var(--border);
+            border-radius: 14px;
+            padding: 24px;
+            margin-bottom: 16px;
+            box-shadow: 0 2px 10px rgba(59,111,212,0.06);
+            transition: box-shadow 0.2s;
         }
 
-        .question-card:hover {
-            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
-        }
+        .question-card:hover { box-shadow: 0 4px 20px rgba(59,111,212,0.12); }
 
         .question-number {
-            color: #667eea;
-            font-weight: bold;
-            font-size: 1.1em;
-            margin-bottom: 15px;
             display: flex;
             align-items: center;
             gap: 10px;
+            margin-bottom: 14px;
+            font-weight: 700;
+            font-size: 0.9em;
+            color: var(--primary);
         }
 
         .difficulty-badge {
-            padding: 4px 12px;
-            border-radius: 12px;
-            font-size: 0.8em;
-            font-weight: 600;
+            padding: 3px 10px;
+            border-radius: 10px;
+            font-size: 0.75em;
+            font-weight: 700;
         }
 
-        .difficulty-easy {
-            background: #d4edda;
-            color: #155724;
-        }
-
-        .difficulty-medium {
-            background: #fff3cd;
-            color: #856404;
-        }
-
-        .difficulty-hard {
-            background: #f8d7da;
-            color: #721c24;
-        }
+        .difficulty-easy { background: #d1fae5; color: #065f46; }
+        .difficulty-medium { background: #fef3c7; color: #92400e; }
+        .difficulty-hard { background: #fee2e2; color: #991b1b; }
 
         .question-text {
-            font-size: 1.15em;
-            color: #333;
-            margin-bottom: 20px;
-            line-height: 1.6;
+            font-size: 1em;
+            color: var(--text);
+            margin-bottom: 18px;
+            line-height: 1.65;
             font-weight: 500;
         }
 
-        /* Options */
-        .options {
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-        }
+        /* OPTIONS */
+        .options { display: flex; flex-direction: column; gap: 10px; }
 
         .option {
-            background: #f8f9ff;
-            border: 2px solid #e0e0e0;
-            border-radius: 12px;
-            padding: 15px 20px;
+            background: #f8fbff;
+            border: 1.5px solid var(--border);
+            border-radius: 10px;
+            padding: 13px 18px;
             cursor: pointer;
-            transition: all 0.3s;
+            transition: all 0.2s;
             display: flex;
             align-items: center;
-            font-size: 1em;
+            font-size: 0.92em;
         }
 
         .option:hover {
-            border-color: #667eea;
-            background: #e8ebff;
-            transform: translateX(5px);
+            border-color: var(--primary);
+            background: #eff6ff;
+            transform: translateX(4px);
         }
 
         .option input[type="radio"] {
-            margin-right: 15px;
-            width: 20px;
-            height: 20px;
+            margin-right: 12px;
+            width: 18px; height: 18px;
             cursor: pointer;
-            accent-color: #667eea;
+            accent-color: var(--primary);
+            flex-shrink: 0;
         }
 
         .option.selected {
-            border-color: #667eea;
-            background: #667eea;
+            border-color: var(--primary);
+            background: var(--grad);
             color: white;
-            font-weight: 500;
+            font-weight: 600;
         }
 
         .option.correct {
-            border-color: #28a745;
-            background: #28a745;
+            border-color: var(--success);
+            background: var(--success);
             color: white;
-            font-weight: 500;
+            font-weight: 600;
         }
 
         .option.incorrect {
-            border-color: #dc3545;
-            background: #dc3545;
+            border-color: var(--danger);
+            background: var(--danger);
             color: white;
-            font-weight: 500;
+            font-weight: 600;
         }
 
-        /* Explanation Box */
+        /* EXPLANATION */
         .explanation {
-            background: #fff3cd;
-            border-left: 4px solid #ffc107;
-            padding: 15px;
-            margin-top: 15px;
-            border-radius: 5px;
+            background: #fffbeb;
+            border-left: 4px solid var(--warning);
+            padding: 12px 16px;
+            margin-top: 14px;
+            border-radius: 6px;
+            font-size: 0.86em;
+            line-height: 1.5;
             display: none;
         }
 
-        .explanation.show {
-            display: block;
-        }
+        .explanation.show { display: block; }
+        .explanation strong { color: #92400e; }
 
-        .explanation strong {
-            color: #856404;
-        }
-
-        /* Score Display */
-        .score-section {
-            text-align: center;
-            padding: 40px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border-radius: 15px;
-            margin: 30px 0;
-        }
-
-        .score-section h2 {
-            font-size: 4em;
-            margin-bottom: 20px;
-            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
-        }
-
-        .score-section p {
-            font-size: 1.3em;
-            margin: 10px 0;
-        }
-
-        .pass-status {
-            font-size: 1.8em;
-            margin-top: 20px;
-            font-weight: bold;
-        }
-
-        /* Control Buttons */
+        /* CONTROLS */
         .controls {
             display: flex;
             justify-content: center;
-            gap: 20px;
-            margin: 30px 0;
+            gap: 16px;
+            margin-top: 24px;
             flex-wrap: wrap;
         }
 
-        .btn-secondary {
-            background: #6c757d;
-            color: white;
-            border: none;
-            padding: 12px 30px;
-            font-size: 1em;
-            border-radius: 50px;
-            cursor: pointer;
-            transition: all 0.3s;
-        }
-
-        .btn-secondary:hover {
-            background: #5a6268;
-            transform: translateY(-2px);
-        }
-
-        /* Loading Spinner */
-        .loading {
-            text-align: center;
-            padding: 60px;
-            display: none;
-        }
-
-        .loading.show {
-            display: block;
-        }
+        /* LOADING */
+        .loading { display: none; text-align: center; padding: 48px; }
+        .loading.show { display: block; }
 
         .spinner {
-            border: 5px solid #f3f3f3;
-            border-top: 5px solid #667eea;
+            border: 4px solid #e2e8f0;
+            border-top: 4px solid var(--primary);
             border-radius: 50%;
-            width: 60px;
-            height: 60px;
-            animation: spin 1s linear infinite;
-            margin: 0 auto 20px;
+            width: 48px; height: 48px;
+            animation: spin 0.9s linear infinite;
+            margin: 0 auto 16px;
         }
 
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(12px); }
+            to { opacity: 1; transform: translateY(0); }
         }
 
-        /* Hidden class */
-        .hidden {
-            display: none !important;
+        .loading h3 { color: var(--primary); font-size: 1em; margin-bottom: 4px; }
+        .loading p { color: var(--muted); font-size: 0.88em; }
+
+        /* SCORE BANNER */
+        .score-banner {
+            background: var(--grad);
+            color: white;
+            border-radius: 14px;
+            padding: 36px;
+            text-align: center;
+            margin-bottom: 24px;
         }
 
-        /* Info Box */
-        .info-box {
-            background: #e7f3ff;
-            border-left: 4px solid #2196f3;
-            padding: 15px;
-            margin: 20px 0;
-            border-radius: 5px;
+        .score-banner h2 {
+            font-size: 4em;
+            font-weight: 800;
+            margin-bottom: 8px;
+            line-height: 1;
         }
 
-        .info-box p {
-            margin: 5px 0;
-            color: #0c5460;
+        .score-banner p { font-size: 1.05em; opacity: 0.9; margin: 6px 0; }
+
+        .pass-status {
+            font-size: 1.3em;
+            font-weight: 700;
+            margin-top: 14px;
         }
 
-        /* Responsive */
-        @media (max-width: 768px) {
-            .content {
-                padding: 20px;
-            }
+        /* REVIEW HEADING */
+        .review-heading {
+            font-size: 1em;
+            font-weight: 700;
+            color: var(--text);
+            margin: 24px 0 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
 
-            .question-text {
-                font-size: 1em;
-            }
-
-            .score-section h2 {
-                font-size: 3em;
-            }
-
-            .controls {
-                flex-direction: column;
-            }
-
-            .btn-primary, .btn-secondary {
-                width: 100%;
-            }
+        @media (max-width: 600px) {
+            .controls { flex-direction: column; align-items: center; }
+            .btn-primary, .btn-secondary { width: 100%; text-align: center; }
+            .score-banner h2 { font-size: 3em; }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
+
+    <!-- NAVBAR -->
+    <nav class="navbar">
+        <div class="navbar-brand">AI Resume<span>Analyzer</span></div>
+        <button class="nav-back" onclick="goBackToResume()">← Back to Analyzer</button>
+    </nav>
+
+    <div class="page">
+        <div class="page-title">
             <h1>🎯 MCQ Test</h1>
             <p id="headerSubtitle">Test Your Knowledge</p>
         </div>
 
-        <div class="content">
-            <!-- Start Section -->
-            <div id="startSection" class="start-section">
-                <div class="info-box">
-                    <p><strong>📝 Instructions:</strong></p>
-                    <p>• You will be asked 10 multiple choice questions</p>
-                    <p>• Select the best answer for each question</p>
-                    <p>• You need 60% to pass the test</p>
-                    <p>• Take your time and read carefully</p>
-                </div>
-                <button class="btn-primary" id="startTestBtn" onclick="startTest()">
-                    🚀 Start Test
-                </button>
+        <!-- START SECTION -->
+        <div class="card" id="startSection">
+            <div class="info-box">
+                <p>📝 Instructions</p>
+                <p>📌 You will be asked 10 multiple choice questions</p>
+                <p>✅ Select the best answer for each question</p>
+                <p>🎯 You need 60% to pass the test</p>
+                <p>⏱️ Take your time and read carefully</p>
             </div>
-
-            <!-- Loading -->
-            <div id="loadingSection" class="loading">
-                <div class="spinner"></div>
-                <p>Loading questions...</p>
+            <div class="start-section">
+                <button class="btn-primary" id="startTestBtn" onclick="startTest()">🚀 Start Test</button>
             </div>
+        </div>
 
-            <!-- Test Section -->
-            <div id="testSection" class="hidden">
+        <!-- LOADING -->
+        <div class="card loading" id="loadingSection">
+            <div class="spinner"></div>
+            <h3>Loading questions...</h3>
+            <p>Fetching questions for your role</p>
+        </div>
+
+        <!-- TEST SECTION -->
+        <div id="testSection" class="hidden">
+            <div class="card">
                 <div class="progress-section">
                     <div class="progress-bar">
-                        <div class="progress-fill" id="progressBar">0%</div>
+                        <div class="progress-fill" id="progressBar" style="width:0%;">0%</div>
                     </div>
                     <p class="progress-text" id="progressText">0 of 10 questions answered</p>
                 </div>
-
-                <div id="questionsContainer"></div>
-
-                <div class="controls">
-                    <button class="btn-primary" id="submitBtn" onclick="submitTest()">
-                        ✅ Submit Test
-                    </button>
-                </div>
             </div>
 
-            <!-- Results Section -->
-            <div id="resultsSection" class="hidden">
-                <div class="score-section">
-                    <h2 id="scorePercentage">0%</h2>
-                    <p id="scoreDetails">You answered 0 out of 10 questions correctly</p>
-                    <p class="pass-status" id="passStatus"></p>
-                </div>
+            <div id="questionsContainer"></div>
 
-                <h3 style="margin: 30px 0 20px 0; color: #333;">📊 Detailed Review:</h3>
-                <div id="reviewContainer"></div>
+            <div class="controls">
+                <button class="btn-primary" id="submitBtn" onclick="submitTest()">✅ Submit Test</button>
+            </div>
+        </div>
 
-                <div class="controls">
-                    <button class="btn-primary" onclick="retakeTest()">
-                        🔄 Take New Test
-                    </button>
-                    <button class="btn-secondary" onclick="goBackToResume()">
-                        📄 Back to Resume Analyzer
-                    </button>
-                </div>
+        <!-- RESULTS SECTION -->
+        <div id="resultsSection" class="hidden">
+            <div class="score-banner">
+                <h2 id="scorePercentage">0%</h2>
+                <p id="scoreDetails">You answered 0 out of 10 questions correctly</p>
+                <p class="pass-status" id="passStatus"></p>
+            </div>
+
+            <div class="review-heading">📊 Detailed Review</div>
+            <div id="reviewContainer"></div>
+
+            <div class="controls">
+                <button class="btn-primary" onclick="retakeTest()">🔄 Take New Test</button>
+                <button class="btn-secondary" onclick="goBackToResume()">📄 Back to Analyzer</button>
             </div>
         </div>
     </div>
 
     <script>
-    // Configuration
     const API_BASE_URL = 'http://localhost:5000';
 
-    // Global variables
     let currentQuestions = [];
     let userAnswers = {};
     let currentQuestionIds = [];
 
-    // Read role from URL
     const urlParams = new URLSearchParams(window.location.search);
     const detectedRole = urlParams.get('role') || 'DEFAULT';
+    document.getElementById('headerSubtitle').textContent = `Role: ${detectedRole}`;
     console.log('Role from URL:', detectedRole);
 
-    // Start the test
     async function startTest() {
         try {
             document.getElementById('startSection').classList.add('hidden');
             document.getElementById('loadingSection').classList.add('show');
-
-            console.log('Fetching questions for role:', detectedRole);
 
             const response = await fetch(`${API_BASE_URL}/api/get-mcq-test?role=${detectedRole}`, {
                 method: 'GET',
@@ -453,7 +464,7 @@
 
             if (data.success) {
                 currentQuestions = data.questions;
-                currentQuestionIds = data.questions.map(q => q.id); 
+                currentQuestionIds = data.questions.map(q => q.id);
                 displayQuestions(data);
             } else {
                 alert('Error: ' + (data.error || 'Could not load questions'));
@@ -468,7 +479,6 @@
         }
     }
 
-    // Display questions
     function displayQuestions(data) {
         document.getElementById('loadingSection').classList.remove('show');
         document.getElementById('testSection').classList.remove('hidden');
@@ -486,9 +496,7 @@
             card.innerHTML = `
                 <div class="question-number">
                     <span>Question ${index + 1} of ${data.total_questions}</span>
-                    <span class="difficulty-badge ${difficultyClass}">
-                        ${(q.difficulty || 'medium').toUpperCase()}
-                    </span>
+                    <span class="difficulty-badge ${difficultyClass}">${(q.difficulty || 'medium').toUpperCase()}</span>
                 </div>
                 <div class="question-text">${q.question}</div>
                 <div class="options" id="options-${q.id}">
@@ -506,7 +514,6 @@
         updateProgress();
     }
 
-    // Select answer
     function selectAnswer(questionId, answer, element) {
         userAnswers[questionId] = answer;
         const optionsContainer = document.getElementById(`options-${questionId}`);
@@ -515,25 +522,19 @@
         updateProgress();
     }
 
-    // Update progress bar
     function updateProgress() {
         const total = currentQuestions.length;
         const answered = Object.keys(userAnswers).length;
         const percentage = total > 0 ? (answered / total) * 100 : 0;
-
         const progressBar = document.getElementById('progressBar');
         progressBar.style.width = percentage + '%';
         progressBar.textContent = `${Math.round(percentage)}%`;
-        document.getElementById('progressText').textContent =
-            `${answered} of ${total} questions answered`;
+        document.getElementById('progressText').textContent = `${answered} of ${total} questions answered`;
     }
 
-    // Submit test
     async function submitTest() {
         if (Object.keys(userAnswers).length < currentQuestions.length) {
-            if (!confirm(`You have only answered ${Object.keys(userAnswers).length} out of ${currentQuestions.length} questions. Submit anyway?`)) {
-                return;
-            }
+            if (!confirm(`You have only answered ${Object.keys(userAnswers).length} out of ${currentQuestions.length} questions. Submit anyway?`)) return;
         }
 
         try {
@@ -544,10 +545,7 @@
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
-                body: JSON.stringify({ 
-    answers: userAnswers,
-    question_ids: currentQuestionIds  // ✅ ADD THIS
-})
+                body: JSON.stringify({ answers: userAnswers, question_ids: currentQuestionIds })
             });
 
             const data = await response.json();
@@ -567,7 +565,6 @@
         }
     }
 
-    // Display results
     function displayResults(data) {
         document.getElementById('testSection').classList.add('hidden');
         document.getElementById('resultsSection').classList.remove('hidden');
@@ -579,10 +576,8 @@
         const passStatus = document.getElementById('passStatus');
         if (data.passed) {
             passStatus.textContent = '🎉 Congratulations! You Passed!';
-            passStatus.style.color = '#4caf50';
         } else {
             passStatus.textContent = "📚 Keep Learning! You'll do better next time!";
-            passStatus.style.color = '#ff9800';
         }
 
         const reviewContainer = document.getElementById('reviewContainer');
@@ -594,19 +589,20 @@
             const isCorrect = result.is_correct;
 
             card.innerHTML = `
-                <div class="question-number">Question ${index + 1}</div>
+                <div class="question-number">Question ${index + 1}
+                    <span class="difficulty-badge ${isCorrect ? 'difficulty-easy' : 'difficulty-hard'}">${isCorrect ? '✅ CORRECT' : '❌ WRONG'}</span>
+                </div>
                 <div class="question-text">${result.question}</div>
                 <div class="options">
                     ${result.options.map(opt => {
                         let className = 'option';
                         if (opt === result.correct_answer) className += ' correct';
                         else if (opt === result.user_answer && !isCorrect) className += ' incorrect';
-                        return `<div class="${className}">${opt}</div>`;
+                        return `<div class="${className}"><span>${opt}</span></div>`;
                     }).join('')}
                 </div>
                 <div class="explanation show">
-                    <strong>${isCorrect ? '✅ Correct!' : '❌ Incorrect'}</strong><br>
-                    ${result.explanation}
+                    <strong>${isCorrect ? '✅ Correct!' : '❌ Incorrect'}</strong> — ${result.explanation}
                 </div>
             `;
             reviewContainer.appendChild(card);
@@ -615,18 +611,17 @@
         window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
-    // Retake test
     function retakeTest() {
         document.getElementById('resultsSection').classList.add('hidden');
         document.getElementById('startSection').classList.remove('hidden');
         currentQuestions = [];
         userAnswers = {};
+        currentQuestionIds = [];
     }
 
-    // Go back to resume analyzer
     function goBackToResume() {
         window.location.href = 'index.html';
     }
-</script>
+    </script>
 </body>
 </html>
